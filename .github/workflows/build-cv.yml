@@ -1,0 +1,49 @@
+name: Build and publish CV
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - main.tex
+      - .github/workflows/build-cv.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v4
+        with:
+          root_file: main.tex
+
+      - name: Generate published PDF and page previews
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y poppler-utils
+          mkdir -p assets
+          rm -f assets/cv.pdf assets/cv-*.png
+          cp main.pdf assets/cv.pdf
+          pdftoppm -png -r 160 main.pdf assets/cv
+
+      - name: Commit generated artifacts
+        if: github.event_name == 'push'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/cv.pdf assets/cv-*.png
+          if git diff --cached --quiet; then
+            echo 'No generated artifact changes to commit.'
+          else
+            git commit -m 'chore: publish generated CV artifacts'
+            git push
+          fi
